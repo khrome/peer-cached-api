@@ -3,17 +3,28 @@ var hashFn = require('object-hash');
 var SDK = require('dat-sdk');
 //var stringStream = require('string-to-stream');
 var dat;
-var datReady = function(cb){
+var waiting = [];
+var datReady = function(options, cb){
     var handler = function(complete){
+        console.log('DAT START');
         if(dat){
             setTimeout(function(){
                 complete(dat);
             }, 0);
         }else{
-            SDK(function(instance){
-                dat = instance;
-                complete(instance);
-            });
+            if(!waiting.length){
+                console.log('SDK INIT');
+                SDK(options).then(function(instance){
+                    console.log('DAT INIT', !!instance);
+                    dat = instance;
+                    cbs = waiting;
+                    waiting = [];
+                    cbs.forEach(function(callback){
+                        callback(instance);
+                    });
+                });
+            }
+            waiting.push(cb);
         }
     }
     if(cb){
@@ -29,17 +40,20 @@ var datReady = function(cb){
 var Client = function(options, cb){
     this.options = options || {};
     if(!this.options.name) throw new Error('No name provided');
-    this.archive = dat.Hyperdrive(this.options.name, {
-      // This archive will disappear after the process exits
-      // This is here so that running the example doesn't clog up your history
-      persist: this.options.persist,
-      // storage can be set to an instance of `random-access-*`
-      // const RAI = require('random-access-idb')
-      // otherwise it defaults to `random-access-web` in the browser
-      // and `random-access-file` in node
-      storage: this.options.storage
+    var ob = this;
+    datReady(this.options, function(){
+        ob.archive = dat.Hyperdrive(ob.options.name, {
+          // This archive will disappear after the process exits
+          // This is here so that running the example doesn't clog up your history
+          persist: ob.options.persist,
+          // storage can be set to an instance of `random-access-*`
+          // const RAI = require('random-access-idb')
+          // otherwise it defaults to `random-access-web` in the browser
+          // and `random-access-file` in node
+          storage: ob.options.storage
+        });
+        if(cb) ob.archive.ready(function(){ cb() });
     });
-    if(cb) this.archive.ready(function(){ cb() });
 };
 Client.prototype.setRequest = function(instance){
     this.request = instance;
@@ -65,9 +79,9 @@ Client.prototype.request = function(options, callback){ //callback = t -> Promis
         }
     }
     if(!this.request) throw new Error('request instance not set!');
-    var hash = hashFn();
+    var hash = hashFn(options);
     var ob = this;
-    datReady(function(){
+    datReady(this.options, function(){
         ob.archive.ready(function(){
             var url = 'dat://'+ob.archive.key.toString('hex');
             console.log('URL', url)
