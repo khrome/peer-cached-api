@@ -36,6 +36,15 @@ var datReady = function(options, cb){
         });
     }
 };
+
+var archiveIsInitialized = function(drive, cb){
+    drive.readdir('/requests', function(err){
+      if(!err) return cb();
+      drive.mkdir('/requests', function(err){
+        return cb(err);
+      })
+    })
+};
 var Client = function(options, cb){
     this.options = options || {};
     if(!this.options.name) throw new Error('No name provided');
@@ -73,7 +82,7 @@ Client.prototype.request = function(options, callback){ //callback = t -> Promis
             rtrn = new Promise(function(res, rej){ resolve = res; reject = rej });
         }else{
             cb = function(err, res, body){
-                callback(err, body);
+                callback(err, res, body);
             };
         }
     }
@@ -84,20 +93,34 @@ Client.prototype.request = function(options, callback){ //callback = t -> Promis
         if(!ob.archive) throw new Error('No Archive Found!');
         ob.archive.ready(function(){
             var url = 'dat://'+ob.archive.key.toString('hex');
-            ob.archive.readFile('/requests/'+hash, function(err, data){
-                console.log('URL', url, arguments)
-                if(err || !data){
-                    requestInstance = ob.requestInstance(options, cb);
-                    if(pipedStream) requestInstance.pipe(pipedStream);
-                }else{
-                    if(cb){
-                        cb(err, data);
+            archiveIsInitialized(ob.archive, function(initError){
+                ob.archive.readFile('/requests/'+hash, function(err, data){
+                    if(err || !data){
+                        requestInstance = ob.requestInstance(options, function(err, res, body){
+                            ob.archive.writeFile(
+                                '/requests/'+hash,
+                                JSON.stringify({
+                                    res : res,
+                                    body : body
+                                }),
+                                function(err){
+                                    cb(err, res, body)
+                                }
+                            )
+                        });
+                        //todo: handle storage on pipe
+                        if(pipedStream) requestInstance.pipe(pipedStream);
                     }else{
-                        if(pipedStream){
-                            //stringStream(data).pipe(pipedStream);
-                        }else throw new Error('No callback, no stream');
+                        if(cb){
+                            var cached = JSON.parse(data.toString());
+                            cb(err, cached.res, cached.body);
+                        }else{
+                            if(pipedStream){
+                                //stringStream(data).pipe(pipedStream);
+                            }else throw new Error('No callback, no stream');
+                        }
                     }
-                }
+                });
             });
         });
     });

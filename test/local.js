@@ -40,31 +40,41 @@ describe('peer-cached-api', function(){
                 if(running === 0){
                     connection.close(function(err){
                         should.not.exist(err);
-                        console.log('REALLY DONE');
-                        backendCalls.should.be.below(2)
+                        backendCalls.should.be.above(0);
+                        backendCalls.should.be.below(2);
                         doneTestingPeers();
                     });
                 }
             }
+            var doRequestB;
             clientA.request({
                 uri:'http://localhost:8080/someapi',
                 json: true
             }, function(err, res, body){
                 should.not.exist(err);
-                console.log('A', body);
+                should.exist(body);
+                should.exist(body.some);
+                should.exist(body.some.message);
+                body.some.message.should.equal('text');
                 complete();
+                doRequestB();
             });
             running++;
             var clientB = new Client(storageOptions);
             clientB.requestInstance = request;
-            clientB.request({
-                uri:'http://localhost:8080/someapi',
-                json: true
-            }, function(err, res, body){
-                should.not.exist(err);
-                console.log('B', body);
-                complete();
-            });
+            doRequestB = function(){
+                clientB.request({
+                    uri:'http://localhost:8080/someapi',
+                    json: true
+                }, function(err, res, body){
+                    should.not.exist(err);
+                    should.exist(body);
+                    should.exist(body.some);
+                    should.exist(body.some.message);
+                    body.some.message.should.equal('text');
+                    complete();
+                });
+            }
             running++;
         });
     });
