@@ -3,13 +3,13 @@
   "version": "0.0.1",
   "dependencies": {
     "dat-sdk": "^2.8.1",
-    "form-data": "^4.0.0",
     "object-hash": "^2.0.3",
-    "polymorhpic-request": "^0.1.0",
-    "request": "^2.88.2",
     "string-to-stream": "^3.0.1"
   },
   "devDependencies": {
+    "polymorhpic-request": "^0.1.0",
+    "form-data": "^4.0.0",
+    "request": "^2.88.2",
     "@babel/core": "^7.12.10",
     "@geut/sodium-javascript-plus": "0.0.6",
     "assert": "^2.0.0",
