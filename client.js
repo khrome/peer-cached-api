@@ -4,35 +4,34 @@ var SDK = require('dat-sdk');
 //var stringStream = require('string-to-stream');
 var dat;
 var waiting = [];
-var datReady = function(options, cb){
-    var handler = function(complete){
-        console.log('DAT START');
-        if(dat){
-            setTimeout(function(){
-                complete(dat);
-            }, 0);
-        }else{
-            if(!waiting.length){
-                console.log('SDK INIT');
-                SDK(options).then(function(instance){
-                    console.log('DAT INIT', !!instance);
-                    dat = instance;
-                    cbs = waiting;
-                    waiting = [];
-                    cbs.forEach(function(callback){
-                        callback(instance);
-                    });
+var handler = function(options, complete){
+    if(dat){
+        setTimeout(function(){
+            complete(undefined, dat);
+        }, 0);
+    }else{
+        if(!waiting.length){
+            SDK(options).then(function(instance){
+                dat = instance;
+                cbs = waiting;
+                waiting = [];
+                cbs.forEach(function(callback){
+                    callback(undefined, instance);
                 });
-            }
-            waiting.push(cb);
+            }).catch(function(err){
+                callback(err);
+            });
         }
+        waiting.push(complete);
     }
+}
+var datReady = function(options, cb){
     if(cb){
-        handler(cb);
+        handler(options, cb);
     }else{
         return new Promise(function(resolve, reject){
             try{
-                handler(resolve);
+                handler(options, resolve);
             }catch(ex){ reject(ex) }
         });
     }
@@ -78,16 +77,17 @@ Client.prototype.request = function(options, callback){ //callback = t -> Promis
             };
         }
     }
-    if(!this.request) throw new Error('request instance not set!');
+    if(!this.requestInstance) throw new Error('request instance not set!');
     var hash = hashFn(options);
     var ob = this;
-    datReady(this.options, function(){
+    datReady(this.options, function(err, datInstance){
+        if(!ob.archive) throw new Error('No Archive Found!');
         ob.archive.ready(function(){
             var url = 'dat://'+ob.archive.key.toString('hex');
-            console.log('URL', url)
             ob.archive.readFile('/requests/'+hash, function(err, data){
+                console.log('URL', url, arguments)
                 if(err || !data){
-                    requestInstance = ob.request(options, cb);
+                    requestInstance = ob.requestInstance(options, cb);
                     if(pipedStream) requestInstance.pipe(pipedStream);
                 }else{
                     if(cb){
